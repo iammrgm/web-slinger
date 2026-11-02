@@ -12,7 +12,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>The Web Slinger: The Menace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,7 +88,7 @@ button:focus-visible, input:focus-visible { outline: .18em solid var(--suit); ou
 @media (orientation: portrait) and (max-width: 700px) { #rot.on { display: block; } }
 
 html { background: #12142b; }
-body { padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+body { position: fixed; inset: 0; height: auto; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 </style>
 </head>
 <body>
@@ -173,6 +174,21 @@ body { padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: c
 
 <script>window.__PWA = true;</script>
 <script>
+// ---- Compatibility: older iPad/iPhone Safari has no roundRect ----
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    r = Array.isArray(r) ? r : [r || 0]; const tl = r[0], tr = r[1] == null ? tl : r[1], br = r[2] == null ? tl : r[2], bl = r[3] == null ? tr : r[3];
+    this.moveTo(x + tl, y); this.lineTo(x + w - tr, y); this.quadraticCurveTo(x + w, y, x + w, y + tr); this.lineTo(x + w, y + h - br);
+    this.quadraticCurveTo(x + w, y + h, x + w - br, y + h); this.lineTo(x + bl, y + h); this.quadraticCurveTo(x, y + h, x, y + h - bl);
+    this.lineTo(x, y + tl); this.quadraticCurveTo(x, y, x + tl, y); this.closePath();
+  };
+}
+// If anything ever goes wrong, say so on screen instead of freezing silently.
+addEventListener('error', e => {
+  let b = document.getElementById('errbar');
+  if (!b) { b = document.createElement('div'); b.id = 'errbar'; b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99;background:#b00020;color:#fff;font:12px system-ui;padding:6px 10px'; document.body.appendChild(b); }
+  b.textContent = 'Oops: ' + (e.message || 'error') + ' (line ' + e.lineno + '). Tell Gareth!';
+});
 // ================= Settings Thomas can change =================
 const W = 800, H = 450, GRAV = .5, RUN = 3.3, JUMP = -9.8, PW = 11, PH = 44;
 const KID = { hearts: 5, enemySpeed: .6, bulletSpeed: 2.6, shotCd: 190, gapScale: .85, bossHpScale: .7, wind: 1.5 };
@@ -292,7 +308,7 @@ function fit() {
   cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr); K = cv.width / W;
   $('rot').classList.toggle('on', portrait);
 }
-addEventListener('resize', fit); fit();
+addEventListener('resize', fit); addEventListener('orientationchange', () => { fit(); setTimeout(fit, 250); }); if (window.visualViewport) visualViewport.addEventListener('resize', fit); fit(); setTimeout(fit, 300);
 function padOn() { touch = true; $('pad').classList.add('on'); fit(); }
 if (touch) $('pad').classList.add('on'); else addEventListener('touchstart', padOn, { once: true, passive: true });
 
@@ -1105,8 +1121,8 @@ function draw() {
 let last = performance.now();
 function loop(now) {
   const dt = Math.min(2.5, (now - last) / 16.667); last = now;
-  if (mode !== 'pause' && mode !== 'menu' && lvl) update(dt);
-  draw(); requestAnimationFrame(loop);
+  try { if (mode !== 'pause' && mode !== 'menu' && lvl) update(dt); draw(); } catch (e) { console.error(e); setTimeout(() => { throw e; }, 0); }
+  requestAnimationFrame(loop);
 }
 refreshMenu(); show('menu'); requestAnimationFrame(loop);
 </script>
